@@ -96,6 +96,7 @@ const App: React.FC = () => {
   const canvas3dRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Logic Refs
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -121,6 +122,7 @@ const App: React.FC = () => {
   // UI State
   const [loading, setLoading] = useState(true);
   const [gestureStatus, setGestureStatus] = useState<string>("Initializing...");
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 
   // --- THREE.JS INITIALIZATION ---
   const initThree = useCallback(() => {
@@ -403,19 +405,22 @@ const App: React.FC = () => {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          replacePhotoWithCustom(img);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Iterate through all selected files
+      Array.from(files).forEach((file: any) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            replacePhotoWithCustom(img);
+          };
+          if (typeof event.target?.result === 'string') {
+            img.src = event.target.result;
+          }
         };
-        if (typeof event.target?.result === 'string') {
-          img.src = event.target.result;
-        }
-      };
-      reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
+      });
     }
   };
 
@@ -465,6 +470,17 @@ const App: React.FC = () => {
     
     // Animation Pop: Scale up momentarily (loop will lerp it back)
     targetMesh.scale.multiplyScalar(2.0);
+  };
+
+  const toggleMusic = () => {
+    if (audioRef.current) {
+      if (isMusicPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(e => console.log("Audio autoplay prevented", e));
+      }
+      setIsMusicPlaying(!isMusicPlaying);
+    }
   };
 
   // --- ANIMATION LOOP ---
@@ -839,6 +855,9 @@ const App: React.FC = () => {
         className="absolute top-0 left-0 w-full h-full z-20"
       />
 
+      {/* Audio Element: Using a royalty free placeholder url. Replace 'love_you_so.mp3' if you have the file locally */}
+      <audio ref={audioRef} loop src="https://cdn.pixabay.com/download/audio/2022/11/22/audio_febc508520.mp3?filename=christmas-magic-126447.mp3" />
+
       <div className="absolute top-4 left-4 z-50 bg-black/40 text-white p-4 rounded-lg backdrop-blur-md max-w-sm border border-white/10 shadow-xl pointer-events-auto">
         <h1 className="text-2xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-yellow-300">
           🎄 AR Photo Tree
@@ -872,11 +891,12 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/10">
+            <div className="pt-2 border-t border-white/10 space-y-2">
               <input 
                 type="file" 
                 ref={fileInputRef} 
                 accept="image/*" 
+                multiple
                 onChange={handleFileChange} 
                 className="hidden" 
               />
@@ -884,7 +904,14 @@ const App: React.FC = () => {
                 onClick={handleUploadClick}
                 className="w-full py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white rounded-md text-sm font-semibold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
               >
-                <span>📷</span> Replace a Photo
+                <span>📷</span> Replace Photos
+              </button>
+
+              <button 
+                onClick={toggleMusic}
+                className={`w-full py-2 text-white rounded-md text-sm font-semibold shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 border border-white/20 ${isMusicPlaying ? 'bg-green-600' : 'bg-gray-700'}`}
+              >
+                <span>{isMusicPlaying ? '🔊' : '🔇'}</span> {isMusicPlaying ? 'Music ON' : 'Music OFF'}
               </button>
             </div>
           </div>

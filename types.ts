@@ -1,4 +1,4 @@
-import { Mesh, Vector3, Euler, Color, Quaternion } from 'three';
+import { Mesh, Vector3, Quaternion } from 'three';
 
 export interface PhotoUserData {
   originalPosition: Vector3;
@@ -17,9 +17,9 @@ export interface PhotoUserData {
   isCustom?: boolean; // Track if this photo has been replaced by user
 }
 
-export interface ExtendedMesh extends Mesh {
+export type ExtendedMesh = Mesh & {
   userData: PhotoUserData;
-}
+};
 
 export enum GestureType {
   NONE = 'NONE',
