@@ -115,6 +115,7 @@ const App: React.FC = () => {
   const thumbsUpTimerRef = useRef<number>(0);
   const hasSpawnedRef = useRef<boolean>(false);
   const animationFrameIdRef = useRef<number>(0);
+  const processingFrameIdRef = useRef<number>(0);
   
   // State for Tree Explosion
   const isExplodedRef = useRef<boolean>(false);
@@ -123,6 +124,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [gestureStatus, setGestureStatus] = useState<string>("Initializing...");
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [cameraPermissionError, setCameraPermissionError] = useState(false);
 
   // --- THREE.JS INITIALIZATION ---
   const initThree = useCallback(() => {
@@ -569,6 +571,47 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(animationId);
   }, []);
 
+  // --- CAMERA & VIDEO PROCESSING ---
+  const processVideo = useCallback(async () => {
+      if (videoRef.current && videoRef.current.readyState >= 2 && handsRef.current) {
+        await handsRef.current.send({ image: videoRef.current });
+      }
+      processingFrameIdRef.current = requestAnimationFrame(processVideo);
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    const constraints = {
+      video: {
+        facingMode: "user",
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    };
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadeddata = () => {
+            videoRef.current?.play().then(() => {
+                 processVideo();
+            }).catch(e => console.error("Video play failed", e));
+          };
+          setCameraPermissionError(false);
+        }
+      } catch (err) {
+        console.error("Error accessing camera:", err);
+        setGestureStatus("Camera Permission Denied");
+        setCameraPermissionError(true);
+        setLoading(false); // Stop spinning loader so user sees the retry button
+      }
+    } else {
+        setGestureStatus("Camera API unavailable");
+        setLoading(false);
+    }
+  }, [processVideo]);
+
 
   // --- MEDIAPIPE LOGIC ---
   useEffect(() => {
@@ -633,40 +676,9 @@ const App: React.FC = () => {
     hands.onResults(onResults);
     handsRef.current = hands;
 
-    const processVideo = async () => {
-      if (videoElement && videoElement.readyState >= 2 && handsRef.current) {
-        await handsRef.current.send({ image: videoElement });
-      }
-      animationFrameIdRef.current = requestAnimationFrame(processVideo);
-    };
-
-    const startCamera = async () => {
-      const constraints = {
-        video: {
-          facingMode: "user",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      };
-
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia(constraints);
-          if (videoElement) {
-            videoElement.srcObject = stream;
-            videoElement.onloadeddata = () => {
-              videoElement.play();
-              processVideo();
-            };
-          }
-        } catch (err) {
-          console.error("Error accessing camera:", err);
-          setGestureStatus("Camera Error");
-        }
-      }
-    };
-
+    // Start camera immediately on mount
     startCamera();
+    
     const cleanupThree = initThree();
 
     return () => {
@@ -674,11 +686,11 @@ const App: React.FC = () => {
          const tracks = (videoElement.srcObject as MediaStream).getTracks();
          tracks.forEach(track => track.stop());
       }
-      cancelAnimationFrame(animationFrameIdRef.current);
+      cancelAnimationFrame(processingFrameIdRef.current);
       if (handsRef.current) handsRef.current.close();
       if (cleanupThree) cleanupThree();
     };
-  }, [initThree]);
+  }, [initThree, startCamera]);
 
 
   // --- GESTURE PROCESSING ---
@@ -863,10 +875,22 @@ const App: React.FC = () => {
           🎄 AR Photo Tree
         </h1>
         {loading ? (
-          <div className="flex items-center gap-2 text-yellow-200">
-            <div className="animate-spin text-xl">❄️</div>
-            <span>Warming up magic...</span>
-          </div>
+           cameraPermissionError ? (
+             <div className="text-red-300 space-y-2">
+                <p>⚠️ Camera access denied.</p>
+                <button 
+                  onClick={startCamera}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded text-white font-bold w-full"
+                >
+                  Enable Camera
+                </button>
+             </div>
+           ) : (
+            <div className="flex items-center gap-2 text-yellow-200">
+              <div className="animate-spin text-xl">❄️</div>
+              <span>Warming up magic...</span>
+            </div>
+           )
         ) : (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
