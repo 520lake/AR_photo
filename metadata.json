@@ -1,0 +1,7 @@
+{
+  "name": "Copy of AR Christmas Tree Photo Wall",
+  "description": "An AR experience where you interact with a floating 3D photo tree using hand gestures via webcam.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
